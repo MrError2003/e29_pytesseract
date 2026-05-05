@@ -137,8 +137,13 @@
   <div id="resultadosCard" class="card shadow-sm d-none">
     <div class="card-header card-header-primary py-2 d-flex justify-content-between align-items-center">
       <span class="fw-semibold">Resultados</span>
-      <input type="text" id="filtroTabla" class="form-control form-control-sm w-auto"
-             placeholder="Filtrar por documento…" />
+      <div class="d-flex gap-2 align-items-center">
+        <button id="btnDescargar" class="btn btn-success btn-sm d-none" title="Descargar resultados en Excel">
+          ⬇ Descargar Excel
+        </button>
+        <input type="text" id="filtroTabla" class="form-control form-control-sm w-auto"
+               placeholder="Filtrar por documento…" />
+      </div>
     </div>
     <div id="tableWrapper">
       <table class="table table-hover table-bordered mb-0 align-middle">
@@ -183,6 +188,7 @@ const cntTotal        = document.getElementById('cntTotal');
 const cntOk           = document.getElementById('cntOk');
 const cntRev          = document.getElementById('cntRev');
 const cntSin          = document.getElementById('cntSin');
+const btnDescargar    = document.getElementById('btnDescargar');
 
 /* ── Estado ──────────────────────────────────────────── */
 let allRows   = [];
@@ -201,6 +207,7 @@ function resetUI() {
   progressSection.classList.add('d-none');
   resumen.classList.add('d-none');
   resultadosCard.classList.add('d-none');
+  btnDescargar.classList.add('d-none');
   tablaBody.innerHTML = '';
   filtroTabla.value = '';
   updateCounters();
@@ -365,6 +372,8 @@ form.addEventListener('submit', async (e) => {
 
         } else if (data.type === 'done') {
           setProgress(totalRows, totalRows);
+          endProcessing(true);
+          return;
 
         } else if (data.type === 'error') {
           showError(data.message);
@@ -378,12 +387,45 @@ form.addEventListener('submit', async (e) => {
   }
 });
 
-function endProcessing() {
+function endProcessing(success = false) {
   btnProcesar.disabled  = false;
   spinner.style.display = 'none';
   btnText.textContent   = 'Procesar';
   progressSection.classList.add('d-none');
+  if (success && allRows.length > 0) {
+    btnDescargar.classList.remove('d-none');
+  }
 }
+
+/* ── Descarga Excel ──────────────────────────────────── */
+btnDescargar.addEventListener('click', async () => {
+  btnDescargar.disabled = true;
+  btnDescargar.textContent = 'Generando…';
+  try {
+    const resp = await fetch('/descargar_excel', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rows: allRows }),
+    });
+    if (!resp.ok) throw new Error('Error del servidor: ' + resp.status);
+    const blob = await resp.blob();
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    const cd   = resp.headers.get('Content-Disposition') || '';
+    const match = cd.match(/filename="?([^"]+)"?/);
+    a.download = match ? match[1] : 'verificacion.xlsx';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  } catch (err) {
+    showError('No se pudo descargar el Excel: ' + err.message);
+  } finally {
+    btnDescargar.disabled = false;
+    btnDescargar.textContent = '⬇ Descargar Excel';
+  }
+});
 </script>
 </body>
 </html>

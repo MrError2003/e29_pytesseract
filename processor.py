@@ -3,7 +3,7 @@ Módulo de procesamiento: descarga imágenes, aplica OCR multi-transformación
 y calcula coincidencias con los datos del Excel con matching aproximado.
 
 Pipeline de imagen (adaptado del enfoque PHP con Intervention Image):
-  - 9 variantes de preprocesamiento × 6 modos PSM de Tesseract
+  - 9 variantes de preprocesamiento x 6 modos PSM de Tesseract
   - Corrección automática de rotación (deskew)
   - Parada anticipada cuando se obtiene texto de buena calidad
   - Fuzzy matching con rapidfuzz para tolerar errores de OCR
@@ -340,10 +340,18 @@ def calculate_match(
     hits += int(found)
 
     # Nombres y apellidos (columnas E, F, G, H)
+    # Segundo nombre (F) y segundo apellido (H) son opcionales:
+    # si están vacíos en el Excel se consideran válidos automáticamente.
+    OPTIONAL_FIELDS = {"segundo_nombre", "segundo_apellido"}
     for label, val in zip(
         ["primer_nombre", "segundo_nombre", "primer_apellido", "segundo_apellido"],
         nombres,
     ):
+        if label in OPTIONAL_FIELDS and (val is None or str(val).strip() == ""):
+            results[label] = {"valor": "", "encontrado": True}
+            total += 1
+            hits += 1
+            continue
         found, fmt = _check_field(ocr_norm, val)
         results[label] = {"valor": fmt, "encontrado": found}
         total += 1
